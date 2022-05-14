@@ -1,76 +1,92 @@
 import './sass/main.scss';
-const axios = require('axios');
-import { Notify } from 'notiflix/build/notiflix-notify-aio';
-import SimpleLightbox from "simplelightbox";
+import Notiflix from 'notiflix';
+import SimpleLightbox from 'simplelightbox';
 import "simplelightbox/dist/simple-lightbox.min.css";
+import GetPhotos from './getImg';
 
-const gallery = document.querySelector(".gallery");
-const input = document.querySelector("#search-form");
-const btn = document.querySelector(".load-more");
-const API_KEY = "27295449-3daac49b31b72326d27830ec0";
+const getPhotos = new GetPhotos();
 
-let page = 1;
-let per_page = 40;
+const refs = {
+  sentinel: document.querySelector("#sentinel"),
+  gallery: document.querySelector(".gallery"),
+  input: document.querySelector("#search-form"),
+  btn: document.querySelector(".load-more"),
+}
 
-// const lightbox = new SimpleLightbox('.gallery a', { captionsData: "alt", captionDelay: 250 });
+function onSearch(event) {
+  event.preventDefault();
+  getPhotos.query = event.currentTarget.elements.searchQuery.value;
 
+  getPhotos.resetPage();
+  clearGallery();
 
-input.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const { elements: { searchQuery } } = event.currentTarget;
-    const result = searchQuery.value;
-    
-    getImg(result).then(photos => {
-        const totalPages = photos.totalHits / per_page;
-        if (page > totalPages) {
-    alert("We're sorry, but you've reached the end of search results.");
-        }
-       
-        
-        renderGallery(photos.hits);
-        page += 1;
-        btn.classList.remove('is-hidden');
-        btn.addEventListener("click", () => {
-            
-            getImg(result).then(photos => {
-                const totalPages = photos.totalHits / per_page;
-                if (page > totalPages) {
-                    alert("We're sorry, but you've reached the end of search results.");
-                }
-       
-                console.log(totalPages);
-                renderGallery(photos.hits);
-                page += 1
-            })
-        });
-        
-    
-    }).catch(error => {
-        // Notiflix.Notify.failure("Oops, there is no country with that name");
+  getPhotos.getImg().then(photos => {
+    if (photos.hits.length === 0) {
+      Notiflix.Notify.failure("Sorry, there are no images matching your search query. Please try again.");
+    } else { Notiflix.Notify.success(`Hooray! We found ${photos.totalHits} images.`);
+    renderGallery(photos.hits);
+    getPhotos.incrementPage();
+    // refs.btn.classList.remove('is-hidden');
+    getLightbox();}
+   
+  }).catch(error => {
     console.log(error)
-    })
-})
+  })
+    // btn.addEventListener("click", () => {
+    //         getPhotos.getImg().then(photos => {
+    //           const totalPages = Math.ceil(photos.totalHits / 40)+1;
+              
+    //             renderGallery(photos.hits);
+    //           getPhotos.incrementPage();
+    //           getLightbox();
+    //           if (getPhotos.page > totalPages) {
+    //               // refs.btn.classList.toggle('is-hidden');
+    //             Notiflix.Notify.warning("We're sorry, but you've reached the end of search results.");
+    //               }
+    //          })
+    //     })
+}
+
+  refs.input.addEventListener("submit", onSearch); 
+   
+  const onEntry = entries => {
+  entries.forEach(entry => {
+      if (entry.isIntersecting && getPhotos.query !== '') {
+      // console.log('Пора грузить еще статьи' + Date.now());
+            getPhotos.getImg().then(photos => {
+              const totalPages = Math.ceil(photos.totalHits / 40)+1;
+              console.log('page:', getPhotos.page);
+              console.log('total Pages: ', totalPages);
+
+                renderGallery(photos.hits);
+              getPhotos.incrementPage();
+              getLightbox();
+              if (getPhotos.page > totalPages) {
+                  // refs.btn.classList.toggle('is-hidden');
+                Notiflix.Notify.warning("We're sorry, but you've reached the end of search results.");
+                  }
+             }).catch(error => {
+               console.log(error.response.status);
+               if (error.response.status === 400) {
+                 Notiflix.Notify.warning("We're sorry, but you've reached the end of search results.")
+               }
+  })
+    }
+  });
+};
+
+const observer = new IntersectionObserver(onEntry, {
+  rootMargin: '150px',
+});
+observer.observe(refs.sentinel);
 
 
-async function getImg(name) {
-    const params = new URLSearchParams({
-        page: page,
-        per_page: per_page,
-        key: API_KEY,
-        image_type: "photo",
-        orientation: "horizontal",
-        safesearch:true,    
-    });
-    const response = await axios.get(`https://pixabay.com/api/?${params}&q=${encodeURIComponent(name)}`);
-    const img = await response.data;
-    console.log(encodeURIComponent(name));
-return img}
-
-  
+function clearGallery() {
+  refs.gallery.innerHTML = '';
+}
 
 
-
-function renderGallery(photos) {
+  function renderGallery(photos) {
     const markup = photos.map((photo) => {
         return `<a href="${photo.largeImageURL}" class="photo-card">
   <img  class="gallery__image" src="${photo.webformatURL}" alt="${photo.tags}" loading="lazy" />
@@ -91,23 +107,17 @@ function renderGallery(photos) {
 </a>`;
     })
     .join("");
-    gallery.insertAdjacentHTML("beforeend", markup);
+    refs.gallery.insertAdjacentHTML("beforeend", markup);
     }
-gallery.addEventListener("click", fullImg);    
-
-
-// function fullImg(event) {
-//     // const lightbox = new SimpleLightbox('.gallery a', { captionsData: "alt", captionDelay: 250 });
-//     event.preventDefault();
-//     console.log(event.target.nodeName);
-//     if (event.target.nodeName !== "IMG") {
-//         return;
-//     }
+   
+function getLightbox() {
+  const lightbox = new SimpleLightbox('.gallery a', { captionsData: "alt", captionDelay: 250 });        
+lightbox.on('show.simplelightbox', function (event) {
+	event.preventDefault();
     
-//     return lightbox;
-// }
-    
-let lightbox = new SimpleLightbox('.gallery a');
-gallery.on('show.simplelightbox', function () {
-	// do something…
-});
+    if (event.target.nodeName !== "A") {
+        return;
+  }
+  lightbox.refresh();
+})
+}
