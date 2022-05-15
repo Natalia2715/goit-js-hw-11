@@ -51,9 +51,9 @@ function onSearch(event) {
    
   const onEntry = entries => {
   entries.forEach(entry => {
-      if (entry.isIntersecting && getPhotos.query !== '') {
+      if (entry.isIntersecting && getPhotos.query !== '' && getPhotos.page!==1) {
       // console.log('Пора грузить еще статьи' + Date.now());
-            getPhotos.getImg().then(photos => {
+        getPhotos.getImg().then(photos => {
               const totalPages = Math.ceil(photos.totalHits / 40)+1;
               console.log('page:', getPhotos.page);
               console.log('total Pages: ', totalPages);
